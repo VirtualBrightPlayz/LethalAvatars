@@ -16,6 +16,7 @@ internal class SwitchAvatar : AvatarMessage
     protected override void Handle(PlayerControllerB player, AvatarMessage data)
     {
         SwitchAvatar switchAvatarMessage = (SwitchAvatar) data;
+        PlayerAvatarAPI.UnloadUnusedBundles();
         Plugin.PluginLogger.LogDebug($"Switching to avatar {AvatarFileHash} from {player.GetIdentifier()}");
         if(player.GetIdentifier() == PlayerAvatarAPI.LocalPlayer!.GetIdentifier())
         {

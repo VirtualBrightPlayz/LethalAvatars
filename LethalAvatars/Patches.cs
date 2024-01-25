@@ -77,6 +77,7 @@ class Patches
             int assignedPlayerObjectId, int serverMoneyAmount, int levelID, int profitQuota, int timeUntilDeadline,
             int quotaFulfilled, int randomSeed, bool isChallenge)
         {
+            PlayerAvatarAPI.UnloadUnusedBundles();
             if(sentClients.Contains(clientId)) return;
             NetworkHandler.connectedPlayers = PlayerAvatarAPI.GetAllPlayers().ToList();
             NetworkHandler.connectedPlayers.ForEach(x =>

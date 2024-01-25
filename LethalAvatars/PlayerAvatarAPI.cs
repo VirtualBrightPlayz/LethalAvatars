@@ -49,6 +49,7 @@ public static class PlayerAvatarAPI
     internal static Dictionary<string, string> cachedAvatarHashes = new();
 
     private static Dictionary<string, BundledAvatarData> cachedAvatars = new();
+    public static List<BundledAvatarData> LoadedAvatars => new(cachedAvatars.Values);
 
     /// <summary>
     /// Gets the current LocalPlayer. Null if no LocalPlayer exists or if not in the GameScene.
@@ -355,5 +356,6 @@ public static class PlayerAvatarAPI
             }
             Plugin.PluginLogger.LogDebug($"Failed to find cached avatar hash for {player.GetIdentifier()}");
         }
+        UnloadUnusedBundles();
     }
 }
