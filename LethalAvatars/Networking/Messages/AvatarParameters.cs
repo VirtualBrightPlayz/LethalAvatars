@@ -55,7 +55,7 @@ internal class AvatarParameters : AvatarMessage
     {
         PlayerControllerB? localPlayer = PlayerAvatarAPI.LocalPlayer;
         if(localPlayer == null || fromId.GetIdentifier() == localPlayer.GetIdentifier()) return;
-        if(!PlayerAvatarAPI.RegisteredAvatars.TryGetValue(fromId, out Avatar avatar)) return;
+        if(!PlayerAvatarAPI.TryGetRegisteredInstancedAvatar(fromId, out Avatar avatar)) return;
         AvatarDriver avatarDriver = avatar.GetComponent<AvatarDriver>();
         avatarDriver.twoHanded = twoHanded;
         Transform? head = avatarDriver.GetBoneFromHumanoid(HumanBodyBones.Head);

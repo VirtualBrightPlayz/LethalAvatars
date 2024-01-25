@@ -53,8 +53,8 @@ internal class SwitchAvatar : AvatarMessage
             return;
         }
         // We have the avatar, load it
-        Avatar? avatar = PlayerAvatarAPI.LoadAvatar(file);
-        if (avatar == null)
+        PlayerAvatarAPI.BundledAvatarData? avatar = PlayerAvatarAPI.LoadAvatar(file);
+        if (avatar?.avatar == null)
         {
             Plugin.PluginLogger.LogError($"Failed to load avatar for {player.GetIdentifier()}");
             PlayerAvatarAPI.ResetPlayer(player);

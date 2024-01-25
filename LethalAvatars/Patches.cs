@@ -30,8 +30,8 @@ class Patches
             // Check if the file exists
             if (File.Exists(Plugin.SelectedAvatar))
             {
-                Avatar? avatar = PlayerAvatarAPI.LoadAvatar(Plugin.SelectedAvatar);
-                if (avatar == null)
+                PlayerAvatarAPI.BundledAvatarData? avatar = PlayerAvatarAPI.LoadAvatar(Plugin.SelectedAvatar);
+                if (avatar?.avatar == null)
                 {
                     Plugin.PluginLogger.LogError($"Failed to load avatar at {Plugin.SelectedAvatar}");
                     if (__instance != null)
@@ -57,7 +57,7 @@ class Patches
     {
         static void Postfix(PlayerControllerB __instance)
         {
-            if(!PlayerAvatarAPI.RegisteredAvatars.TryGetValue(__instance, out Avatar avatar)) return;
+            if(!PlayerAvatarAPI.TryGetRegisteredInstancedAvatar(__instance, out Avatar avatar)) return;
             __instance.localItemHolder = __instance.twoHanded ? avatar.SmallItemGrab :
                 avatar.BigItemGrab == null ? avatar.SmallItemGrab : avatar.BigItemGrab;
         }
@@ -127,7 +127,7 @@ class Patches
         {
             PlayerControllerB? localPlayer = PlayerAvatarAPI.LocalPlayer;
             if(localPlayer == null || !playerScript.IsLocal()) return;
-            if(!PlayerAvatarAPI.RegisteredAvatars.TryGetValue(playerScript, out Avatar avatar)) return;
+            if(!PlayerAvatarAPI.TryGetRegisteredInstancedAvatar(playerScript, out Avatar avatar)) return;
             AvatarDriver avatarDriver = avatar.GetComponent<AvatarDriver>();
             if(avatarDriver == null) return;
             avatarDriver.IncludeParameters["Level"] = playerLevelIndex;
@@ -147,7 +147,7 @@ class Patches
                 return;
             PlayerControllerB? localPlayer = PlayerAvatarAPI.LocalPlayer;
             if(localPlayer == null) return;
-            if(!PlayerAvatarAPI.RegisteredAvatars.TryGetValue(localPlayer, out Avatar avatar)) return;
+            if(!PlayerAvatarAPI.TryGetRegisteredInstancedAvatar(localPlayer, out Avatar avatar)) return;
             AvatarDriver avatarDriver = avatar.GetComponent<AvatarDriver>();
             if(avatarDriver == null) return;
             avatarDriver.IncludeParameters["PullLever"] = true;

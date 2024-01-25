@@ -47,6 +47,7 @@ internal class UILoader
 
     public static void RefreshAvatars()
     {
+        PlayerAvatarAPI.UnloadUnusedBundles();
         while (AvatarsListContent!.childCount > 1)
             Object.DestroyImmediate(AvatarsListContent.GetChild(1).gameObject);
         Button templateButton = AvatarsListContent.GetChild(0).GetComponent<Button>();
@@ -58,16 +59,16 @@ internal class UILoader
             string fileLocation = files[i].Replace('\\', '/');
             if(!Path.GetExtension(fileLocation).Contains("lca")) continue;
             Button newButton = Object.Instantiate(templateButton.gameObject, AvatarsListContent).GetComponent<Button>();
-            Avatar? avatar = PlayerAvatarAPI.LoadAvatar(fileLocation);
-            if (avatar == null)
+            PlayerAvatarAPI.BundledAvatarData? avatar = PlayerAvatarAPI.LoadAvatar(fileLocation);
+            if (avatar?.avatar == null)
             {
                 Plugin.PluginLogger.LogError($"Failed to load AssetBundle at {files[i]}");
                 continue;
             }
             TMP_Text newButtonText = newButton.transform.GetChild(0).GetComponent<TMP_Text>();
-            newButtonText.text = avatar != null ? avatar.AvatarName : String.Empty;
+            newButtonText.text = avatar.avatar != null ? avatar.avatar.AvatarName : String.Empty;
             newButtonText.font = font;
-            newButton.onClick.AddListener(() => CurrentlySelectedAvatar = (fileLocation, avatar));
+            newButton.onClick.AddListener(() => CurrentlySelectedAvatar = (fileLocation, avatar?.avatar));
             RectTransform newButtonRect = newButton.GetComponent<RectTransform>();
             if (i > 0)
             {

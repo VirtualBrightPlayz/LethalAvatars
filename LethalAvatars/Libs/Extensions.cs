@@ -107,14 +107,14 @@ internal static class Extensions
         // Remove current avatar
         if (PlayerAvatarAPI.RegisteredAvatars.ContainsKey(player))
             PlayerAvatarAPI.ResetPlayer(player);
-        SDK.Avatar? avatar = PlayerAvatarAPI.LoadAvatar(combinedData);
-        if (avatar == null)
+        PlayerAvatarAPI.BundledAvatarData? data = PlayerAvatarAPI.LoadAvatar(combinedData);
+        if (data?.avatar == null)
         {
             Plugin.PluginLogger.LogError($"Failed to load avatar for {player.GetIdentifier()}");
             PlayerAvatarAPI.ResetPlayer(player);
             return;
         }
-        if (avatar.AllowDownloading)
+        if (data.avatar.AllowDownloading)
         {
             string hash = GetHashOfData(combinedData);
             bool containsHash = false;
@@ -127,7 +127,7 @@ internal static class Extensions
             }
             if(!containsHash)
             {
-                string name = NameTools.GetSafeName(avatar.gameObject.name.Replace("(clone)", String.Empty).Trim());
+                string name = NameTools.GetSafeName(data.avatar.gameObject.name.Replace("(clone)", String.Empty).Trim());
                 int c = Directory.GetFiles(Plugin.AvatarsPath).Select(Path.GetFileName).Count(x => x == name + ".lca");
                 if (c > 0)
                     name += c.ToString();
@@ -137,7 +137,7 @@ internal static class Extensions
                 fs.Dispose();
             }
         }
-        PlayerAvatarAPI.ApplyNewAvatar(avatar, player, GetHashOfData(combinedData));
+        PlayerAvatarAPI.ApplyNewAvatar(data, player, GetHashOfData(combinedData));
     }
 
     private static IEnumerator _SendInterval(PlayerControllerB player, AvatarData[] avatarDataResponses)

@@ -17,12 +17,38 @@ namespace LethalAvatars;
 
 public static class PlayerAvatarAPI
 {
-    private static Dictionary<PlayerControllerB, Avatar> registeredAvatars = new();
-    public static Dictionary<PlayerControllerB, Avatar> RegisteredAvatars => new(registeredAvatars);
+    public class BundledAvatarData
+    {
+        public readonly AssetBundle bundle;
+        public readonly Avatar avatar;
+
+        public BundledAvatarData(AssetBundle bundle, Avatar bundleAvatar)
+        {
+            this.bundle = bundle;
+            this.avatar = bundleAvatar;
+        }
+    }
+
+    public class PlayerAvatarData
+    {
+        public readonly BundledAvatarData bundledData;
+        public readonly PlayerControllerB player;
+        public readonly Avatar instanceAvatar;
+
+        public PlayerAvatarData(BundledAvatarData bundledData, PlayerControllerB player, Avatar instanceAvatar)
+        {
+            this.bundledData = bundledData;
+            this.player = player;
+            this.instanceAvatar = instanceAvatar;
+        }
+    }
+
+    private static List<PlayerAvatarData> registeredAvatars = new();
+    public static Dictionary<PlayerControllerB, PlayerAvatarData> RegisteredAvatars => registeredAvatars.ToDictionary(x => x.player, x => x);
 
     internal static Dictionary<string, string> cachedAvatarHashes = new();
 
-    private static Dictionary<string, Avatar> cachedAvatars = new();
+    private static Dictionary<string, BundledAvatarData> cachedAvatars = new();
 
     /// <summary>
     /// Gets the current LocalPlayer. Null if no LocalPlayer exists or if not in the GameScene.
@@ -42,7 +68,18 @@ public static class PlayerAvatarAPI
 
     public static PlayerControllerB[] GetAllPlayers() => Object.FindObjectsOfType<PlayerControllerB>();
 
-    private static Avatar? LoadAvatar(AssetBundle assetBundle, string assetBundleHash)
+    public static bool TryGetRegisteredInstancedAvatar(PlayerControllerB player, out Avatar avatar)
+    {
+        #nullable disable
+        avatar = null;
+        #nullable restore
+        if (!RegisteredAvatars.TryGetValue(player, out PlayerAvatarData data))
+            return false;
+        avatar = data.instanceAvatar;
+        return avatar != null;
+    }
+
+    private static BundledAvatarData? LoadAvatar(AssetBundle assetBundle, string assetBundleHash)
     {
         Avatar avatar;
         try
@@ -52,28 +89,31 @@ public static class PlayerAvatarAPI
         catch (Exception)
         {
             // Probably failed to find the avatar
+            assetBundle.Unload(true);
             return null;
         }
-        cachedAvatars.Add(assetBundleHash, avatar);
-        return Object.Instantiate(avatar.gameObject).GetComponent<Avatar>();
+        BundledAvatarData data = new(assetBundle, avatar);
+        cachedAvatars.Add(assetBundleHash, data);
+        return data;
     }
 
     /// <summary>
     /// Loads an Avatar AssetBundle from file path
     /// </summary>
     /// <param name="fileLocation">The file to load</param>
-    /// <returns>Nullable Avatar; null if failed to load</returns>
-    public static Avatar? LoadAvatar(string fileLocation)
+    /// <returns>Nullable BundledAvatarData; null if failed to load</returns>
+    public static BundledAvatarData? LoadAvatar(string fileLocation)
     {
         string hash = Extensions.GetHashOfFile(fileLocation);
-        if (cachedAvatars.TryGetValue(hash, out Avatar loadedAvatar))
+        if (cachedAvatars.TryGetValue(hash, out BundledAvatarData loadedAvatar))
         {
-            if(loadedAvatar == null)
+            // TODO: is this needed?
+            if(loadedAvatar.avatar == null)
             {
                 cachedAvatars.Remove(hash);
                 return null;
             }
-            return Object.Instantiate(loadedAvatar.gameObject).GetComponent<Avatar>();
+            return loadedAvatar;
         }
         try
         {
@@ -92,11 +132,11 @@ public static class PlayerAvatarAPI
     /// </summary>
     /// <param name="avatarData">AssetBundle data</param>
     /// <returns>Nullable Avatar; null if failed to load</returns>
-    public static Avatar? LoadAvatar(byte[] avatarData)
+    public static BundledAvatarData? LoadAvatar(byte[] avatarData)
     {
         string hash = Extensions.GetHashOfData(avatarData);
-        if (cachedAvatars.TryGetValue(hash, out Avatar loadedAvatar))
-            return Object.Instantiate(loadedAvatar.gameObject).GetComponent<Avatar>();
+        if (cachedAvatars.TryGetValue(hash, out BundledAvatarData loadedAvatar))
+            return loadedAvatar;
         try
         {
             AssetBundle assetBundle = AssetBundle.LoadFromMemory(avatarData);
@@ -129,10 +169,10 @@ public static class PlayerAvatarAPI
     /// <summary>
     /// Applies an Avatar to a player's model
     /// </summary>
-    /// <param name="clonedAvatar">The Avatar to use. Do NOT use the original from the AssetBundle.</param>
+    /// <param name="clonedAvatar">The BundledAvatarData to use.</param>
     /// <param name="player">The player to apply the Avatar to</param>
     /// <param name="hash">The MD5 hash of the data for the Avatar</param>
-    public static void ApplyNewAvatar(Avatar clonedAvatar, PlayerControllerB player, string hash)
+    public static void ApplyNewAvatar(BundledAvatarData avatarData, PlayerControllerB player, string hash)
     {
         // Disable and rename old stuff
         Transform scav = player.transform.Find("ScavengerModel");
@@ -149,6 +189,8 @@ public static class PlayerAvatarAPI
         Transform spine003 = metarig.Find("spine/spine.001/spine.002/spine.003");
         spine003.Find("LevelSticker").gameObject.SetActive(false);
         spine003.Find("BetaBadge").gameObject.SetActive(false);
+        // create new clone of avatar
+        Avatar clonedAvatar = Object.Instantiate(avatarData.avatar.gameObject).GetComponent<Avatar>();
         // Add new stuff
         clonedAvatar.gameObject.name = "avatar";
         clonedAvatar.transform.SetParent(metarig.parent);
@@ -161,7 +203,8 @@ public static class PlayerAvatarAPI
         avatarDriver.lastServerItemGrab = player.serverItemHolder;
         Transform cameraTransform = metarig.Find("CameraContainer/MainCamera");
         avatarDriver.AnimationDone(clonedAvatar.GetComponent<Animator>(), cameraTransform, player.IsLocal());
-        registeredAvatars.Add(player, clonedAvatar);
+        PlayerAvatarData data = new(avatarData, player, clonedAvatar);
+        registeredAvatars.Add(data);
         if (cachedAvatarHashes.ContainsKey(player.GetIdentifier()))
             cachedAvatarHashes[player.GetIdentifier()] = hash;
         else
@@ -211,7 +254,7 @@ public static class PlayerAvatarAPI
             Transform avatar = scav.GetChild(i);
             if(avatar.GetComponent<Avatar>() == null) continue;
             Object.DestroyImmediate(avatar.gameObject);
-            registeredAvatars.Remove(player);
+            registeredAvatars.Remove(RegisteredAvatars[player]);
             if(player != LocalPlayer) return;
             Transform metarig = scav.Find("metarig");
             Transform armsMetaRig = metarig.Find("ScavengerModelArmsOnly/Circle");
@@ -225,6 +268,30 @@ public static class PlayerAvatarAPI
             if (renderSpecificCamera != null)
                 Object.DestroyImmediate(renderSpecificCamera);
         }
+        UnloadUnusedBundles();
+    }
+
+    public static void UnloadUnusedBundles()
+    {
+        List<string> toBeRemoved = new();
+        registeredAvatars.RemoveAll(x => x.player == null);
+        foreach (KeyValuePair<string, BundledAvatarData> dataKvp in cachedAvatars)
+        {
+            if (!registeredAvatars.Any(x => x.bundledData == dataKvp.Value))
+            {
+                Plugin.PluginLogger.LogDebug($"{dataKvp.Value.avatar.AvatarName} unloading...");
+                dataKvp.Value.bundle.Unload(true);
+                toBeRemoved.Add(dataKvp.Key);
+            }
+            else
+            {
+                Plugin.PluginLogger.LogDebug($"{dataKvp.Value.avatar.AvatarName} not unloaded.");
+            }
+        }
+        foreach (string remove in toBeRemoved)
+        {
+            cachedAvatars.Remove(remove);
+        }
     }
     
     public static void Reset()
@@ -233,6 +300,11 @@ public static class PlayerAvatarAPI
         {
             if(!RegisteredAvatars.ContainsKey(player)) continue;
             try{ResetPlayer(player);}catch(Exception){}
+        }
+        foreach (PlayerAvatarData data in registeredAvatars)
+        {
+            Plugin.PluginLogger.LogDebug($"{data.bundledData.avatar.AvatarName} unloading...");
+            data.bundledData.bundle.Unload(true);
         }
         registeredAvatars.Clear();
         terminal = null;
@@ -244,10 +316,10 @@ public static class PlayerAvatarAPI
         {
             // No avatar in the first place
             if(!RegisteredAvatars.ContainsKey(player))
-                return;
+                continue;
             // No refresh needed if we still have an avatar
-            if (RegisteredAvatars.ContainsKey(player) && RegisteredAvatars[player] != null)
-                return;
+            if (RegisteredAvatars.ContainsKey(player) && RegisteredAvatars[player].instanceAvatar != null)
+                continue;
             if(cachedAvatarHashes.ContainsKey(player.GetIdentifier()))
             {
                 string hash = cachedAvatarHashes[player.GetIdentifier()];
@@ -262,10 +334,10 @@ public static class PlayerAvatarAPI
                 }
                 if (!string.IsNullOrEmpty(file))
                 {
-                    Avatar? avatar = LoadAvatar(file);
-                    if (avatar != null)
+                    BundledAvatarData? avatar = LoadAvatar(file);
+                    if (avatar?.avatar != null)
                         ApplyNewAvatar(avatar, player, hash);
-                    return;
+                    continue;
                 }
             }
             byte[]? data = null;
@@ -276,10 +348,10 @@ public static class PlayerAvatarAPI
             }
             if (data != null)
             {
-                Avatar? avatar = LoadAvatar(data);
-                if(avatar != null)
+                BundledAvatarData? avatar = LoadAvatar(data);
+                if(avatar?.avatar != null)
                     ApplyNewAvatar(avatar, player, Extensions.GetHashOfData(data));
-                return;
+                continue;
             }
             Plugin.PluginLogger.LogDebug($"Failed to find cached avatar hash for {player.GetIdentifier()}");
         }
